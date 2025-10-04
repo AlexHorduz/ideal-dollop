@@ -18,7 +18,8 @@ import yaml
 
 import matplotlib.pyplot as plt
 
-IMG_EXTS = { ".jpg", ".jpeg", ".png" }
+from transforms import build_transforms
+from transforms import IMAGENET_MEAN, IMAGENET_STD, denormalize
 
 def _list_images(images_dir: Path) -> List[Path]:
     files = []
@@ -100,22 +101,32 @@ class TrafficSignsDataset(Dataset):
 
         boxes, labels = self._read_labels(label_path, (W, H))
 
-        if self.transform is not None:
-            img = self.transform(img)
-
-        area = (boxes[:, 2] - boxes[:, 0]).clamp(min=0) * (boxes[:, 3] - boxes[:, 1]).clamp(min=0)
-        iscrowd = torch.zeros((labels.shape[0],), dtype=torch.int64)
-        size = torch.tensor([H, W], dtype=torch.int64)
-        image_id = torch.tensor([idx], dtype=torch.int64)
-
         target: Dict[str, Any] = {
             "boxes": boxes,
             "labels": labels,
+        }
+
+        if self.transform is not None:
+            img, target = self.transform(img, target)
+            if isinstance(img, torch.Tensor):
+                H_t, W_t = int(img.shape[-2]), int(img.shape[-1])
+            else:
+                W_t, H_t = img.size
+        else:
+            H_t, W_t = H, W
+
+        boxes_out = target["boxes"]
+        area = (boxes_out[:, 2] - boxes_out[:, 0]).clamp(min=0) * (boxes_out[:, 3] - boxes_out[:, 1]).clamp(min=0)
+        iscrowd = torch.zeros((target["labels"].shape[0],), dtype=torch.int64)
+        size = torch.tensor([H_t, W_t], dtype=torch.int64)
+        image_id = torch.tensor([idx], dtype=torch.int64)
+
+        target.update({
             "image_id": image_id,
             "area": area,
             "iscrowd": iscrowd,
             "size": size,
-        }
+        })
         target["class_names"] = self.class_names
 
         return img, target
@@ -129,24 +140,26 @@ if __name__ == "__main__":
     src = kagglehub.dataset_download("pkdarabi/cardetection")
     root = Path(src) / "car" 
 
-    tfm = transforms.Compose([
-        transforms.ToTensor(),
-    ])
+    train_tfm = build_transforms("train", size=(640, 640), augment=True)
+    val_tfm = build_transforms("valid", size=(640, 640), augment=False)
+    test_tfm = build_transforms("test",  size=(640, 640), augment=False)
 
-    train_ds = TrafficSignsDataset(root, split="train", transform=tfm)
-    val_ds = TrafficSignsDataset(root, split="valid", transform=tfm)
-    test_ds = TrafficSignsDataset(root, split="test",  transform=tfm)
+    train_ds = TrafficSignsDataset(root, split="train", transform=train_tfm)
+    val_ds = TrafficSignsDataset(root, split="valid", transform=val_tfm)
+    test_ds = TrafficSignsDataset(root, split="test",  transform=test_tfm)
 
-    train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, num_workers=4, collate_fn=detection_collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=4, shuffle=False, num_workers=4, collate_fn=detection_collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=4, shuffle=False, num_workers=4, collate_fn=detection_collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=4, shuffle=True,  num_workers=4, collate_fn=detection_collate_fn)
+    val_loader   = DataLoader(val_ds,   batch_size=4, shuffle=False, num_workers=4, collate_fn=detection_collate_fn)
+    test_loader  = DataLoader(test_ds,  batch_size=4, shuffle=False, num_workers=4, collate_fn=detection_collate_fn)
     
     print("samples:", len(train_ds), len(val_ds), len(test_ds))
     print("batches:", len(train_loader), len(val_loader), len(test_loader))
 
     idx = random.randrange(len(train_ds))
     img, target = train_ds[idx]
-    img_t = (img * 255).clamp(0, 255).to(torch.uint8)
+
+    img_vis = denormalize(img, IMAGENET_MEAN, IMAGENET_STD)
+    img_t = (img_vis * 255).clamp(0, 255).to(torch.uint8)
 
     labels_txt = [str(l.item()) for l in target["labels"]]
     vis = draw_bounding_boxes(img_t, target["boxes"], labels=labels_txt, colors="lime", width=2)
