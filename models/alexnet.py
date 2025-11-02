@@ -39,14 +39,20 @@ class AlexNetOD(nn.Module):
     
     def forward(self, x):
         x = self.features(x)
-        x = self.avgpool(x)
+        # Workaround for MPS adaptive pooling limitation
+        if x.device.type == 'mps':
+            device = x.device
+            x = self.avgpool(x.cpu()).to(device)
+        else:
+            x = self.avgpool(x)
         x = self.fc(x)
         return x
 
 if __name__ == "__main__":
     import time
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    import utils
+    
+    device = utils.get_device()
     batch_size = 8
 
     model = AlexNetOD(num_classes=15).to(device)

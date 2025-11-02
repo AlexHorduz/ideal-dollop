@@ -460,7 +460,8 @@ if __name__ == "__main__":
     print("Best thresholds per class:", pr['best_threshold'])
 
     # simple loss example
-    device = torch.device('cpu')
+    import utils
+    device = utils.get_device()
     pred_boxes = torch.tensor([[10.0,10.0,20.0,20.0]], device=device)
     gt_boxes = torch.tensor([[11.0,11.0,21.0,21.0]], device=device)
     pred_obj_logits = torch.tensor([0.5], device=device)  # logits

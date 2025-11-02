@@ -90,8 +90,9 @@ class YOLOv1(nn.Module):
 
 if __name__ == "__main__":
     import time
+    import utils
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = utils.get_device()
     batch_size = 8
 
     model = YOLOv1(num_classes=15).to(device)
