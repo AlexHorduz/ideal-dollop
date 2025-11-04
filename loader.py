@@ -116,7 +116,13 @@ class TrafficSignsDataset(Dataset):
             H_t, W_t = H, W
 
         boxes_out = target["boxes"]
-        area = (boxes_out[:, 2] - boxes_out[:, 0]).clamp(min=0) * (boxes_out[:, 3] - boxes_out[:, 1]).clamp(min=0)
+
+        # Handle case when there are no boxes
+        if boxes_out.numel() == 0 or boxes_out.ndim == 1:
+            area = torch.zeros((0,), dtype=torch.float32)
+        else:
+            area = (boxes_out[:, 2] - boxes_out[:, 0]).clamp(min=0) * (boxes_out[:, 3] - boxes_out[:, 1]).clamp(min=0)
+
         iscrowd = torch.zeros((target["labels"].shape[0],), dtype=torch.int64)
         size = torch.tensor([H_t, W_t], dtype=torch.int64)
         image_id = torch.tensor([idx], dtype=torch.int64)
