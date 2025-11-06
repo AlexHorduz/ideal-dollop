@@ -80,14 +80,14 @@ TRAINING_CONFIG = {
 }
 
 HYPERPARAMETER_SEARCH_SPACE = {
-    'lr': [1e-4, 5e-4, 1e-3],  # learning rate
-    'epochs': [20],  # number of epochs,
+    'lr': [5e-4, 1e-3],  # learning rate
+    'epochs': [7],  # number of epochs,
     'batch_size': [32],  # batch size
     'lambda_box': [0.05],  # box loss weight
     'lambda_obj': [1.0],  # objectness loss weight
     'lambda_cls': [0.5],  # classification loss weight
     'optimizer': ['adam'],  # optimizer type
-    'weight_decay': [1e-5, 1e-4, 5e-4],  # L2 regularization,
+    'weight_decay': [1e-4, 5e-4],  # L2 regularization,
     'augment': [True],  # data augmentation
 }
 
