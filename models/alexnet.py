@@ -26,12 +26,15 @@ class AlexNetOD(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2)
         )
         
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        # On macOS MPS backend adaptive pooling currently requires the output size
+        # to evenly divide the input spatial dimensions. The feature extractor
+        # produces 5x5 maps for 224x224 inputs, so target a 5x5 pooled output.
+        self.avgpool = nn.AdaptiveAvgPool2d((5, 5))
         
         # YOLO-style fully connected head
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(256*6*6, 4096),
+            nn.Linear(256*5*5, 4096),
             nn.LeakyReLU(0.1),
             nn.Dropout(0.5),
             nn.Linear(4096, grid_size*grid_size*(B*5 + num_classes))
@@ -39,12 +42,7 @@ class AlexNetOD(nn.Module):
     
     def forward(self, x):
         x = self.features(x)
-        # Workaround for MPS adaptive pooling limitation
-        if x.device.type == 'mps':
-            device = x.device
-            x = self.avgpool(x.cpu()).to(device)
-        else:
-            x = self.avgpool(x)
+        x = self.avgpool(x)
         x = self.fc(x)
         return x
 
